@@ -87,13 +87,18 @@ For "ground truth" healthy counterparts
 Uszing CL ideas from HACA3: (disease to healthy skin representations, pigmentation CL to encourage capturing healthier skin tones (although issue remains with tone regulation for healthy genrations) 
 
 \subsection{Model Architecture}
-The network uses 
-Prior to the patch being passed into the texture encoder, it undergoes randomized decolorization motivated by the approach in \cite{yang_automated_2027}, where there is a monotonic pixel-wise transformation from $[0, 1]^3  \rightarrow [0,1]$. For each training image, non-negative channel weights are sampled from a symmetric Dirichlet distribution and used to form a random convex projection of the RGB channels. The resulting single-channel image is then subjected to random perturbations to destroy intensity cues while preserving spatial organization. This discourages the texture encoder from relying on chromatic and intensity cues when constructing the spatial skin representation. Instead, the skin encoder receives a monochromatic image input, which effectively disentangles it from color-related formation contained in the pigmentation vector. The skin color and appearance is encoded by a 16-dimensional pigmentation vector.
+The network uses three encoders to learn three disentangled representations: a CNN that gives a skin map that is mean to capture high frequency texture details, a CNN that gives a pigmentation vector, and a disease map that captures disease related change in relation to the baseline.\\
+
+\textbf{NOT SO SURE ABOUT RAND IMPLEMENTATION. TRY RMMD (AS ORIGINALLY DONE) AND IF BETTER JUST DO THAT AND DISCARD }
+Prior to the patch being passed into the skin encoder, it undergoes randomized decolorization motivated by the approach in \cite{yang_automated_2027}, where there is a monotonic pixel-wise transformation from $[0, 1]^3  \rightarrow [0,1]$. For each training image, non-negative channel weights are sampled from a symmetric Dirichlet distribution and used to form a random convex projection of the RGB channels. The resulting single-channel image is then subjected to random perturbations to destroy intensity cues while preserving spatial organization. This discourages the texture encoder from relying on chromatic and intensity cues when constructing the spatial skin representation. Instead, the skin encoder receives a monochromatic image input, which effectively disentangles it from color-related formation contained in the pigmentation vector. The skin color and appearance is encoded by a 16-dimensional pigmentation vector, which is disentangled from disease-related appearance via \eqref{eq:pig_contrastive}. Together, the pigmentation and skin representations are passed to the decoder to reconstruct a baseline representation of skin without disease, and this output is enforced by an L1 loss to the healthy pixels outside the lesion map (if applicable) \\
+
+Afterwards, the disease encoder's representation adds an RGB residual to the baseline representation that captures the disease-related change pertaining to the patch (if any). The disease representation is disentangled from healthy appearance via \eqref{eq:dis_contrastive}. This is the final reconstruction output that has an L1 loss to the overall input. 
+
 
 
 \subsubsection{Contrastive Learning}
 In order to encourage the pigemntation vector to be disentangled from disease-related coloration and to encourage it to capture patient-specific pigmentation that relates to healthy skin,  we use a supervised contrastive loss as detailed below. The set of valid anchors is $i \in I \equiv {1...N}$ and $A(i) \equiv I \setminus {i}$. This encourages the pigmentation vector to capture similar skin tone characteristics associated with healthy patches regardless of the disease status of the input patch. \\
-\begin{equation}
+\begin{equation}[pig]
 \mathcal{L}_{\mathrm{pig}}
 =
 -\sum_{i\in\mathcal{I}}
@@ -104,6 +109,7 @@ In order to encourage the pigemntation vector to be disentangled from disease-re
 \sum_{a\in\mathcal{A}(i)}
 \exp\left(\mathbf{p}_i^\top \mathbf{p}_a / \tau\right)
 },
+\label{eq:pig_contrastive}
 \end{equation}
 
 \noindent where
@@ -128,9 +134,9 @@ skin. \\
 }{
 \sum_{a\in\mathcal{A}(i)}
 \exp\left(\mathbf{d}_i^\top \mathbf{d}_a / \tau\right)
-}.
+},
+\label{eq:dis_contrastive}
 \end{equation}
-
 \noindent where
 \[
 \begin{aligned}
@@ -143,9 +149,8 @@ skin. \\
 
 
 
+\subsubsection{Overall Loss Formulation}
 
-
-\subsubsection{Loss Formulation}
 
 \section{Results}
 \subsection{Disease Removal Generation Metrics}
